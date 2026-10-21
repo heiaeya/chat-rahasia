@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Chat Berdua</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { height:100%; }
+  body { font-family: Arial, Helvetica, sans-serif; background:#ece5dd; color:#111; }
+  /* SETUP */
+  #setup { min-height:100%; display:flex; align-items:center; justify-content:center; background:#075e54; padding:20px; }
+  #setup .card { background:#fff; border-radius:12px; padding:28px 22px; width:100%; max-width:360px; text-align:center; box-shadow:0 4px 18px rgba(0,0,0,.3); }
+  #setup h1 { font-size:22px; color:#075e54; margin-bottom:6px; }
+  #setup p { font-size:14px; color:#555; margin-bottom:18px; line-height:1.5; }
+  #setup input { width:100%; padding:13px; font-size:16px; border:1px solid #ccc; border-radius:8px; margin-bottom:14px; }
+  #setup button { width:100%; padding:13px; font-size:16px; background:#25d366; color:#fff; border:none; border-radius:8px; font-weight:bold; cursor:pointer; }
+  #setup .lock { font-size:36px; margin-bottom:10px; }
+  /* CHAT LAYOUT */
+  #chat { display:none; height:100%; flex-direction:column; }
+  #header { background:#075e54; color:#fff; padding:10px 14px; display:flex; align-items:center; gap:10px; box-shadow:0 1px 3px rgba(0,0,0,.3); z-index:2; }
+  #avatar { width:40px; height:40px; border-radius:50%; background:#128c7e; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:17px; flex-shrink:0; overflow:hidden; }
+  #header .info { flex:1; min-width:0; }
+  #partnerName { font-size:16px; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #partnerStatus { font-size:12px; opacity:.85; }
+  #menuBtn { background:none; border:none; color:#fff; font-size:22px; padding:4px 8px; cursor:pointer; }
+  #messages { flex:1; overflow-y:auto; padding:12px 10px 6px; background:#ece5dd; }
+  .day-note { text-align:center; margin:8px 0 12px; }
+  .day-note span { background:#fdf3c6; color:#555; font-size:11.5px; padding:5px 10px; border-radius:6px; box-shadow:0 1px 1px rgba(0,0,0,.12); }
+  .row { display:flex; margin-bottom:3px; }
+  .row.me { justify-content:flex-end; }
+  .bubble { max-width:78%; padding:7px 9px 5px; border-radius:8px; box-shadow:0 1px 1px rgba(0,0,0,.15); position:relative; word-wrap:break-word; overflow-wrap:break-word; }
+  .row.me .bubble { background:#dcf8c6; border-top-right-radius:0; }
+  .row.her .bubble { background:#fff; border-top-left-radius:0; }
+  .bname { font-size:12px; font-weight:bold; color:#128c7e; margin-bottom:2px; }
+  .quote { background:rgba(0,0,0,.06); border-left:3px solid #25d366; border-radius:4px; padding:5px 7px; margin-bottom:5px; font-size:12.5px; color:#444; }
+  .quote b { color:#075e54; display:block; font-size:12px; }
+  .btext { font-size:14.5px; line-height:1.45; white-space:pre-wrap; }
+  .bmeta { text-align:right; font-size:11px; color:#888; margin-top:3px; }
+  .bmeta .checks { color:#53bdeb; font-weight:bold; letter-spacing:-3px; margin-left:4px; }
+  .bmeta .checks.grey { color:#999; }
+  .bubble:active { filter:brightness(.96); }
+  #replyBar { display:none; background:#f0f0f0; border-top:1px solid #ddd; padding:8px 12px; font-size:13px; color:#444; }
+  #replyBar b { color:#075e54; }
+  #replyBar .x { float:right; background:none; border:none; font-size:16px; color:#888; cursor:pointer; }
+  #typingBar { display:none; padding:4px 14px; font-size:12px; color:#555; background:#ece5dd; font-style:italic; }
+  #inputBar { background:#f0f0f0; padding:7px 8px; display:flex; align-items:flex-end; gap:7px; }
+  #msgInput { flex:1; border:none; border-radius:24px; padding:11px 15px; font-size:15px; resize:none; max-height:110px; outline:none; font-family:inherit; }
+  #sendBtn { width:46px; height:46px; border-radius:50%; background:#128c7e; color:#fff; border:none; font-size:19px; cursor:pointer; flex-shrink:0; }
+  #sendBtn:active { background:#075e54; }
+  #netWarn { display:none; background:#b3261e; color:#fff; text-align:center; font-size:12.5px; padding:5px; }
+  .empty { text-align:center; color:#777; font-size:13.5px; margin-top:30px; line-height:1.6; padding:0 30px; }
+</style>
+</head>
+<body>
+
+<div id="setup">
+  <div class="card">
+    <div class="lock">&#128274;</div>
+    <h1>Chat Berdua</h1>
+    <!-- Lobby: no room code yet -->
+    <div id="lobby">
+      <p>Buat room baru buat kalian berdua, atau gabung room yang udah ada pakai kode.</p>
+      <button id="createRoomBtn" style="background:#128c7e;">&#10133; Buat Room Baru</button>
+      <div id="createdBox" style="display:none;margin-top:14px;text-align:left;">
+        <p style="margin-bottom:6px;">Room kamu udah jadi! Simpan &amp; bagikan link ini cuma ke dia:</p>
+        <input id="createdLink" type="text" readonly>
+        <button id="enterCreatedBtn">Masuk ke Room Ini</button>
+      </div>
+      <div style="margin:18px 0 10px;color:#999;font-size:13px;">— atau gabung pakai kode —</div>
+      <input id="joinCode" type="text" placeholder="Tempel kode / link room..." autocomplete="off">
+      <button id="joinBtn" style="background:#075e54;">Gabung Room</button>
+    </div>
+    <!-- In a room: ask name once -->
+    <div id="nameForm" style="display:none;">
+      <p>Ruang chat pribadi, cuma buat berdua.<br>Masukin nama kamu sekali aja, langsung bisa chat.</p>
+      <input id="nameInput" type="text" placeholder="Nama kamu..." maxlength="30" autocomplete="off">
+      <button id="enterBtn">Masuk Chat</button>
+      <p style="margin-top:12px;margin-bottom:6px;font-size:12px;color:#999;">Kode room ini:</p>
+      <input id="roomCodeShow" type="text" readonly style="font-size:12px;padding:9px;color:#555;">
+      <button id="backLobbyBtn" style="background:#fff;color:#075e54;border:1px solid #075e54;">Ganti / Buat Room Lain</button>
+    </div>
+    <p style="margin-top:14px;margin-bottom:0;font-size:12px;color:#999;">Jangan bagikan link room ke orang lain ya.</p>
+  </div>
+</div>
+
+<div id="chat">
+  <div id="header">
+    <div id="avatar">?</div>
+    <div class="info">
+      <div id="partnerName">Chat Berdua</div>
+      <div id="partnerStatus">menghubungkan...</div>
+    </div>
+    <button id="menuBtn" title="Menu">&#8942;</button>
+  </div>
+  <div id="netWarn">Koneksi bermasalah, mencoba lagi...</div>
+  <div id="messages"></div>
+  <div id="typingBar"></div>
+  <div id="replyBar"><button class="x" id="replyCancel">&#10005;</button><b id="replyName"></b><br><span id="replyText"></span></div>
+  <div id="inputBar">
+    <textarea id="msgInput" rows="1" placeholder="Ketik pesan..."></textarea>
+    <button id="sendBtn" title="Kirim">&#10148;</button>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+var API = "https://api.restful-api.dev/objects/";
+function getRoom(){
+  var h = location.hash || "";
+  var m = h.match(/r=([a-zA-Z0-9]+)/);
+  return m ? m[1] : "";
+}
+var ROOM = getRoom();
+var LS_ME = "cb_me_" + ROOM, LS_MSG = "cb_msg_" + ROOM;
+var me = null, messages = [], presence = {}, replyTo = null;
+var lastTypingSent = "", lastHeartbeat = 0, sending = false;
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function uid(){ return "m" + Date.now().toString(36) + Math.random().toString(36).slice(2,9); }
+function cid(){ return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2,9); }
+function fmtTime(ts){ var d=new Date(ts); var hh=d.getHours(); var mm=d.getMinutes(); return (hh<10?"0":"")+hh+":"+(mm<10?"0":"")+mm; }
+function saveLocal(){ try{ localStorage.setItem(LS_MSG, JSON.stringify(messages.slice(-300))); }catch(e){} }
+function loadLocal(){ try{ var raw=localStorage.getItem(LS_MSG); if(raw){ messages=JSON.parse(raw)||[]; } }catch(e){ messages=[]; } }
+
+function mergeMessages(incoming){
+  var byId = {}, i, m;
+  for(i=0;i<messages.length;i++) byId[messages[i].id]=messages[i];
+  var changed=false;
+  for(i=0;i<incoming.length;i++){
+    m=incoming[i];
+    if(!m || !m.id) continue;
+    if(!byId[m.id]){ byId[m.id]=m; changed=true; }
+    else if(!byId[m.id].sent && m.sent){ byId[m.id]=m; changed=true; }
+  }
+  if(changed){
+    var arr=[]; for(var k in byId){ if(byId.hasOwnProperty(k)) arr.push(byId[k]); }
+    arr.sort(function(a,b){ return a.ts-b.ts; });
+    messages = arr.slice(-300);
+    saveLocal();
+  }
+  return changed;
+}
+function mergePresence(p){
+  if(!p) return;
+  for(var k in p){ if(p.hasOwnProperty(k)) presence[k]=p[k]; }
+}
+function partner(){
+  var best=null;
+  for(var k in presence){ if(presence.hasOwnProperty(k) && k!==me.id){ if(!best || presence[k].lastSeen>presence[best].lastSeen) best=k; } }
+  if(best) return presence[best];
+  // fallback: from messages
+  for(var i=messages.length-1;i>=0;i--){ if(messages[i].cid!==me.id) return { name: messages[i].name, lastSeen: 0, typing:false }; }
+  return null;
+}
+
+/* ---------- API sync ---------- */
+function apiGet(cb){
+  fetch(API+ROOM, { cache:"no-store" }).then(function(r){ return r.json(); }).then(function(j){
+    var d = (j && j.data) ? j.data : {};
+    cb(null, d);
+  }).catch(function(e){ cb(e, null); });
+}
+function apiPut(data, cb){
+  fetch(API+ROOM, { method:"PUT", headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ name:"arya-private-chat-room", data:data }) })
+  .then(function(r){ return r.json(); }).then(function(j){ cb && cb(null,j); })
+  .catch(function(e){ cb && cb(e,null); });
+}
+// fetch-merge-put: keeps server + local union, self-heals if server lost data
+function pushToServer(extraPresence, cb){
+  apiGet(function(err, d){
+    if(err){ cb && cb(err); return; }
+    mergeMessages(d.messages||[]);
+    mergePresence(d.presence||{});
+    if(extraPresence){ presence[me.id]=extraPresence; }
+    var data = { messages: messages.slice(-300), presence: presence };
+    apiPut(data, function(e){ cb && cb(e); });
+  });
+}
+function poll(){
+  apiGet(function(err, d){
+    if(err){ $("netWarn").style.display="block"; return; }
+    $("netWarn").style.display="none";
+    var changed = mergeMessages(d.messages||[]);
+    mergePresence(d.presence||{});
+    if(changed) render(false);
+    renderStatus();
+    heartbeat();
+  });
+}
+function heartbeat(){
+  var now = Date.now();
+  var typing = ($("msgInput").value.trim().length>0);
+  var stateKey = typing ? "t" : "o";
+  if(now-lastHeartbeat < 15000 && lastTypingSent===stateKey) return;
+  lastHeartbeat = now; lastTypingSent = stateKey;
+  pushToServer({ name: me.name, lastSeen: now, typing: typing }, function(){});
+}
+
+/* ---------- Rendering ---------- */
+function render(forceScroll){
+  var box = $("messages");
+  var nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 140;
+  if(messages.length===0){
+    box.innerHTML = '<div class="empty">Belum ada pesan.<br>Kirim pesan pertama kamu &#128150;</div>';
+    return;
+  }
+  var html = '<div class="day-note"><span>Pesan di ruang ini hanya bisa dibuka pakai link rahasia kalian berdua</span></div>';
+  for(var i=0;i<messages.length;i++){
+    var m = messages[i];
+    var mine = m.cid===me.id;
+    html += '<div class="row '+(mine?"me":"her")+'">';
+    html += '<div class="bubble" data-mid="'+esc(m.id)+'">';
+    if(!mine) html += '<div class="bname">'+esc(m.name)+'</div>';
+    if(m.replayMsg) html += '<div class="quote"><b>'+esc(m.replayName||"")+'</b>'+esc(m.replayMsg.slice(0,90))+'</div>';
+    html += '<div class="btext">'+esc(m.text)+'</div>';
+    var p = partner();
+    var read = p && p.lastSeen && p.lastSeen > m.ts;
+    html += '<div class="bmeta">'+fmtTime(m.ts);
+    if(mine) html += '<span class="checks '+(read?"":"grey")+'">&#10003;&#10003;</span>';
+    html += '</div></div></div>';
+  }
+  box.innerHTML = html;
+  // reply on click bubble
+  var bubbles = box.querySelectorAll(".bubble");
+  for(var j=0;j<bubbles.length;j++){
+    bubbles[j].addEventListener("click", function(){
+      var mid = this.getAttribute("data-mid");
+      for(var i=0;i<messages.length;i++) if(messages[i].id===mid){ setReply(messages[i]); break; }
+    });
+  }
+  if(forceScroll || nearBottom) box.scrollTop = box.scrollHeight;
+}
+function renderStatus(){
+  var p = partner();
+  if(p){
+    $("partnerName").textContent = p.name || "Chat Berdua";
+    $("avatar").textContent = (p.name||"?").charAt(0).toUpperCase();
+    var age = Date.now() - (p.lastSeen||0);
+    if(p.typing){ $("partnerStatus").textContent = "sedang mengetik..."; }
+    else if(p.lastSeen && age < 40000){ $("partnerStatus").textContent = "online"; }
+    else if(p.lastSeen){ $("partnerStatus").textContent = "terakhir online " + fmtTime(p.lastSeen); }
+    else { $("partnerStatus").textContent = ""; }
+    $("typingBar").style.display = p.typing ? "block" : "none";
+    if(p.typing) $("typingBar").textContent = p.name + " sedang mengetik...";
+  } else {
+    $("partnerName").textContent = "Chat Berdua";
+    $("partnerStatus").textContent = "menunggu dia online...";
+    $("typingBar").style.display = "none";
+  }
+}
+function setReply(m){
+  replyTo = m;
+  $("replyBar").style.display="block";
+  $("replyName").textContent = (m.cid===me.id ? "Kamu" : m.name);
+  $("replyText").textContent = m.text.slice(0,90);
+  $("msgInput").focus();
+}
+function clearReply(){ replyTo=null; $("replyBar").style.display="none"; }
+
+/* ---------- Send ---------- */
+function send(){
+  var input = $("msgInput");
+  var text = input.value.trim();
+  if(!text || sending) return;
+  var m = { id: uid(), cid: me.id, name: me.name, text: text, ts: Date.now(), sent:false };
+  if(replyTo){ m.replayMsg = replyTo.text; m.replayName = replyTo.name; }
+  messages.push(m); saveLocal(); render(true);
+  input.value=""; input.style.height="auto"; clearReply();
+  sending = true;
+  pushToServer({ name: me.name, lastSeen: Date.now(), typing:false }, function(err){
+    sending = false;
+    if(!err){ m.sent = true; saveLocal(); }
+    render(false);
+  });
+}
+
+/* ---------- Boot ---------- */
+function startChat(){
+  $("setup").style.display="none";
+  var c = $("chat"); c.style.display="flex";
+  loadLocal(); render(true); renderStatus();
+  poll();
+  setInterval(poll, 3000);
+  setInterval(renderStatus, 5000);
+}
+function roomLink(code){ return location.origin + location.pathname + "#r=" + code; }
+function parseCode(raw){
+  if(!raw) return "";
+  var v = String(raw).trim();
+  var m = v.match(/r=([a-zA-Z0-9]+)/);
+  if(m) return m[1];
+  v = v.replace(/[^a-zA-Z0-9]/g, "");
+  return v;
+}
+function gotoRoom(code){ location.hash = "r=" + code; location.reload(); }
+function initLobby(){
+  $("lobby").style.display="block"; $("nameForm").style.display="none";
+  var createdCode = "";
+  $("createRoomBtn").addEventListener("click", function(){
+    var btn = this; btn.disabled = true; btn.textContent = "Membuat room...";
+    fetch(API, { method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ name:"chat-berdua-room", data:{ messages:[], presence:{} } }) })
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      btn.disabled = false; btn.innerHTML = "&#10133; Buat Room Baru";
+      if(j && j.id){
+        createdCode = j.id;
+        $("createdLink").value = roomLink(createdCode);
+        $("createdBox").style.display="block";
+      } else { alert("Gagal membuat room, coba lagi ya."); }
+    })
+    .catch(function(){ btn.disabled = false; btn.innerHTML = "&#10133; Buat Room Baru"; alert("Gagal membuat room (koneksi?), coba lagi ya."); });
+  });
+  $("createdLink").addEventListener("click", function(){ this.select(); });
+  $("enterCreatedBtn").addEventListener("click", function(){ if(createdCode) gotoRoom(createdCode); });
+  $("joinBtn").addEventListener("click", function(){
+    var code = parseCode($("joinCode").value);
+    if(!code){ alert("Tempel kode / link room-nya dulu ya"); return; }
+    gotoRoom(code);
+  });
+  $("joinCode").addEventListener("keydown", function(e){ if(e.key==="Enter") $("joinBtn").click(); });
+}
+function init(){
+  if(!ROOM){ initLobby(); return; }
+  $("lobby").style.display="none"; $("nameForm").style.display="block";
+  $("roomCodeShow").value = ROOM;
+  $("roomCodeShow").addEventListener("click", function(){ this.select(); });
+  $("backLobbyBtn").addEventListener("click", function(){ location.hash=""; location.reload(); });
+  try{ var raw=localStorage.getItem(LS_ME); if(raw) me=JSON.parse(raw); }catch(e){}
+  if(me && me.id && me.name){ startChat(); return; }
+  $("enterBtn").addEventListener("click", function(){
+    var name = $("nameInput").value.trim();
+    if(!name){ alert("Isi nama kamu dulu ya"); return; }
+    me = { id: cid(), name: name };
+    try{ localStorage.setItem(LS_ME, JSON.stringify(me)); }catch(e){}
+    startChat();
+    pushToServer({ name: me.name, lastSeen: Date.now(), typing:false }, function(){});
+  });
+  $("nameInput").addEventListener("keydown", function(e){ if(e.key==="Enter") $("enterBtn").click(); });
+}
+$("sendBtn").addEventListener("click", send);
+$("msgInput").addEventListener("keydown", function(e){
+  if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); send(); }
+});
+$("msgInput").addEventListener("input", function(){
+  this.style.height="auto"; this.style.height=Math.min(this.scrollHeight,110)+"px";
+  heartbeat();
+});
+$("replyCancel").addEventListener("click", clearReply);
+$("menuBtn").addEventListener("click", function(){
+  var act = prompt("Menu:\n1 = Ganti nama\n2 = Hapus riwayat di HP ini\n3 = Lihat link room ini\n4 = Keluar / ganti room\n\nKetik nomornya:");
+  if(act==="3"){
+    prompt("Link room ini (salin & simpan baik-baik):", roomLink(ROOM));
+    return;
+  }
+  if(act==="4"){
+    if(confirm("Keluar dari room ini dan kembali ke lobi?")){ location.hash=""; location.reload(); }
+    return;
+  }
+  if(act==="1"){
+    var n = prompt("Nama baru:", me.name);
+    if(n && n.trim()){ me.name=n.trim(); try{ localStorage.setItem(LS_ME, JSON.stringify(me)); }catch(e){}
+      pushToServer({ name: me.name, lastSeen: Date.now(), typing:false }, function(){}); alert("Nama diganti jadi: "+me.name); }
+  } else if(act==="2"){
+    if(confirm("Hapus riwayat chat di HP ini saja? (di HP dia tidak ikut terhapus)")){
+      messages=[]; saveLocal(); render(true);
+    }
+  }
+});
+document.addEventListener("visibilitychange", function(){ if(!document.hidden && me) poll(); });
+init();
+})();
+</script>
+</body>
+</html>
