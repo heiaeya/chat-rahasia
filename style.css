@@ -7,7 +7,8 @@
   #setup p { font-size:14px; color:#555; margin-bottom:18px; line-height:1.5; }
   #setup input { width:100%; padding:13px; font-size:16px; border:2px solid #111; border-radius:12px; margin-bottom:14px; background:#fff; }
   #setup button { width:100%; padding:13px; font-size:16px; background:#111; color:#fff; border:2.5px solid #111; border-radius:14px 18px 14px 18px/18px 14px 18px 14px; font-weight:bold; cursor:pointer; box-shadow:3px 3px 0 rgba(17,17,17,.35); }
-  #setup .lock { font-size:36px; margin-bottom:10px; }
+  #setup .brand { background:#5ce1e6; border:2.5px solid #111; border-radius:18px 22px 16px 24px/24px 16px 22px 18px; box-shadow:4px 4px 0 #111; padding:16px 18px; margin:0 auto 20px; max-width:270px; }
+  #setup .brand img { display:block; width:100%; height:auto; }
   #chat { display:none; height:100%; flex-direction:column; max-width:480px; margin:0 auto; background:#f1f1f1; box-shadow:0 0 0 2.5px #111; }
   #header { background:#fff; color:#111; padding:10px 14px; display:flex; align-items:center; gap:10px; border-bottom:2.5px solid #111; z-index:2; }
   #avatar { width:40px; height:40px; border-radius:50%; background:#fff; border:2.5px solid #111; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:17px; flex-shrink:0; overflow:hidden; color:#111; }

@@ -39,6 +39,8 @@ Web chat pribadi, khusus buat berdua. Dibuat ringan supaya tetap lancar di brows
 - `index.html` — struktur halaman (lobi + ruang chat)
 - `style.css` — semua tampilan / tema
 - `app.js` — semua logika chat (kirim/terima pesan, realtime, online/typing, reply)
+- `assets/` — logo Chat6: `wordmark.svg` (tulisan Chat6 transparan, dipakai di halaman depan) & `logo.svg` (ikon bundar) — format SVG berisi gambar PNG supaya tetap ringan & utuh di repo
+- Ikon tab browser (favicon) = logo bundar Chat6, tertanam langsung di `index.html` sebagai data URI
 - `config.example.js` — contoh konfigurasi Supabase; salin jadi `config.js` untuk menjalankan
 - `src/supabase-schema.sql` — skema database yang perlu dijalankan sekali di Supabase
 

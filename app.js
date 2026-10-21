@@ -197,7 +197,7 @@ function render(forceScroll){
 function renderStatus(){
   var p = partner();
   if(p){
-    $("partnerName").textContent = p.name || "Chat Berdua";
+    $("partnerName").textContent = p.name || "Chat6";
     $("avatar").textContent = (p.name||"?").charAt(0).toUpperCase();
     var age = Date.now() - (p.lastSeen||0);
     var typing = p.typing && p.typingTs && (Date.now()-p.typingTs < 6000);
@@ -208,7 +208,7 @@ function renderStatus(){
     $("typingBar").style.display = typing ? "block" : "none";
     if(typing) $("typingBar").textContent = p.name + " sedang mengetik...";
   } else {
-    $("partnerName").textContent = "Chat Berdua";
+    $("partnerName").textContent = "Chat6";
     $("partnerStatus").textContent = wsOpen ? "menunggu dia online..." : "menghubungkan...";
     $("typingBar").style.display = "none";
   }
