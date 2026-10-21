@@ -9,7 +9,8 @@ Web chat pribadi ala WhatsApp, khusus buat berdua. Dibuat ringan supaya tetap la
 - Buat room sendiri — klik **Buat Room Baru**, dapat link + kode room unik
 - Gabung room pakai kode / link room
 - Masuk cukup pakai nama (sekali saja), tanpa password & tanpa daftar
-- Bubble chat ala WhatsApp, pesan terkirim **real-time** (WebSocket, tanpa polling)
+- Tampilan gaya sketsa neo-brutalist (bubble putih tepian hitam + bayangan keras, avatar bulat, kolom selebar layar HP) — bukan ala WhatsApp
+- Pesan terkirim **real-time** (WebSocket, tanpa polling)
 - Balas pesan (reply) — tap bubble pesan
 - Status online / terakhir dilihat + indikator "sedang mengetik..."
 - Centang dua (biru = sudah dilihat pasangan online)
