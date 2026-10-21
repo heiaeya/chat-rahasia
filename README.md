@@ -1,8 +1,8 @@
-# Chat Berdua 💬
+# ChatVI 💬
 
-Web chat pribadi ala WhatsApp, khusus buat berdua. Dibuat ringan supaya tetap lancar di browser HP lama (Android 7) yang sudah tidak bisa menjalankan aplikasi chat modern.
+Web chat pribadi, khusus buat berdua. Dibuat ringan supaya tetap lancar di browser HP lama (Android 7) yang sudah tidak bisa menjalankan aplikasi chat modern.
 
-**Live:** https://chat-berdua.pages.dev
+**Live:** https://chatvi.pages.dev
 
 ## Fitur
 
@@ -27,12 +27,35 @@ Web chat pribadi ala WhatsApp, khusus buat berdua. Dibuat ringan supaya tetap la
 
 ## Teknologi
 
-- 1 file `index.html` — HTML + CSS + vanilla JavaScript, tanpa framework (sengaja, biar ringan di browser lama)
-- Hosting statis: Cloudflare Pages
+- Vanilla HTML + CSS + JavaScript, tanpa framework & tanpa build step (sengaja, biar ringan di browser lama dan gampang diedit)
+- Hosting statis: Cloudflare Pages (atau hosting statis apa pun)
 - Database: [Supabase](https://supabase.com) (PostgreSQL) — tabel `messages`, 1 baris per pesan, difilter per `room` (= kode room dari link)
 - Sinkronisasi: REST untuk riwayat & kirim pesan + Supabase Realtime (WebSocket) untuk pesan masuk, status online & "sedang mengetik..."
 - Skema database: lihat `src/supabase-schema.sql`
 
-## Pengembangan
+## Struktur File
 
-Edit `index.html`, lalu deploy ulang folder yang berisi file tersebut sebagai situs statis (mis. Cloudflare Pages).
+- `index.html` — struktur halaman (lobi + ruang chat)
+- `style.css` — semua tampilan / tema
+- `app.js` — semua logika chat (kirim/terima pesan, realtime, online/typing, reply)
+- `config.example.js` — contoh konfigurasi Supabase; salin jadi `config.js` untuk menjalankan
+- `src/supabase-schema.sql` — skema database yang perlu dijalankan sekali di Supabase
+
+## Jalankan Sendiri (Fork)
+
+1. Fork repo ini, lalu clone.
+2. Buat project gratis di [Supabase](https://supabase.com) (tanpa kartu kredit).
+3. Di Supabase project kamu: buka **SQL Editor**, jalankan isi `src/supabase-schema.sql`.
+4. Ambil **Project URL** dan **anon public key** dari **Project Settings → API**.
+5. Salin `config.example.js` menjadi `config.js`, isi kedua nilainya dengan kredensial Supabase kamu.
+6. Deploy folder ini sebagai situs statis (mis. Cloudflare Pages) — atau buka `index.html` lewat server lokal apa pun.
+
+Catatan: `config.js` masuk `.gitignore` supaya kredensial tiap orang tidak ikut ter-commit. Anon key memang dirancang untuk publik; keamanan room bertumpu pada kode room yang rahasia.
+
+## Kontribusi
+
+Kontribusi fitur & perbaikan sangat diterima! Silakan fork repo ini, buat perubahan di branch kamu, lalu buka **Pull Request**. Ide yang kepakai: kirim foto, notifikasi, tema baru, dll.
+
+## Lisensi
+
+MIT — lihat file `LICENSE`. Bebas dipakai, diubah, dan disebarluaskan.
