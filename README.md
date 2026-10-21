@@ -44,6 +44,8 @@ Web chat pribadi, khusus buat berdua. Dibuat ringan supaya tetap lancar di brows
 - `config.example.js` — contoh konfigurasi Supabase; salin jadi `config.js` untuk menjalankan
 - `src/supabase-schema.sql` — skema database yang perlu dijalankan sekali di Supabase
 
+> **Deploy otomatis:** repo ini tersambung ke Cloudflare Pages — setiap push ke branch `main` langsung ter-deploy ke situs live.
+
 ## Jalankan Sendiri (Fork)
 
 1. Fork repo ini, lalu clone.
