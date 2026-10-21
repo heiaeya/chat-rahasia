@@ -36,5 +36,3 @@ Web chat pribadi ala WhatsApp, khusus buat berdua. Dibuat ringan supaya tetap la
 ## Pengembangan
 
 Edit `index.html`, lalu deploy ulang folder yang berisi file tersebut sebagai situs statis (mis. Cloudflare Pages).
-
-Terinspirasi dari arsitektur chat real-time di [And-Learning-path](https://github.com/Mipan-Zuzu/And-Learning-path) (fitur online/typing/reply), disederhanakan untuk 2 orang dan browser lawas.
