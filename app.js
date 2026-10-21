@@ -64,7 +64,7 @@ function partner(){
 
 /* ---------- REST ---------- */
 function fetchHistory(){
-  fetch(REST + "?room=eq." + encodeURIComponent(ROOM) + "&order=ts.asc&limit=300", { headers: headers() })
+  fetch(SUPA_URL + "/rest/v1/rpc/get_messages", { method: "POST", headers: headers(), body: JSON.stringify({ p_room: ROOM }) })
   .then(function(r){ return r.json(); })
   .then(function(rows){
     if(rows && rows.length!==undefined){
@@ -80,6 +80,7 @@ function postMessage(m){
   fetch(REST, { method:"POST", headers: headers({ "Prefer": "return=minimal" }), body: JSON.stringify(msgToRow(m)) })
   .then(function(r){
     if(!r.ok){ $("netWarn").style.display="block"; setTimeout(fetchHistory, 2500); }
+    else { broadcast("msg", m); }
   })
   .catch(function(){ $("netWarn").style.display="block"; setTimeout(fetchHistory, 2500); });
 }
@@ -95,11 +96,6 @@ function broadcast(event, payload){
 function publishPresence(){ if(me) broadcast("presence", { cid: me.id, name: me.name, lastSeen: Date.now() }); }
 function publishTyping(t){ if(me) broadcast("typing", { cid: me.id, name: me.name, typing: !!t, ts: Date.now() }); }
 function joinChannels(){
-  wsSend({ topic: DB_TOPIC, event: "phx_join",
-    payload: { config: { broadcast: { ack:false, self:false }, presence: { key:"" },
-      postgres_changes: [ { event:"INSERT", schema:"public", table:"messages", filter:"room=eq."+ROOM } ] },
-      access_token: SUPA_KEY },
-    ref: String(refCounter++) });
   wsSend({ topic: ROOM_TOPIC, event: "phx_join",
     payload: { config: { broadcast: { ack:false, self:false }, presence: { key: me.id } }, access_token: SUPA_KEY },
     ref: String(refCounter++) });
@@ -108,13 +104,7 @@ function onWsMessage(evt){
   var d = null;
   try{ d = JSON.parse(evt.data); }catch(e){ return; }
   if(!d || !d.topic) return;
-  if(d.topic === DB_TOPIC && d.event === "postgres_changes"){
-    var rec = d.payload && d.payload.data && d.payload.data.record;
-    if(rec && rec.room===ROOM && rec.cid!==me.id){
-      if(mergeMessages([rowToMsg(rec)])) render(false);
-      renderStatus();
-    }
-  } else if(d.topic === ROOM_TOPIC && d.event === "broadcast"){
+  if(d.topic === ROOM_TOPIC && d.event === "broadcast"){
     var p = d.payload && d.payload.payload;
     if(!p || !p.cid || p.cid===me.id) return;
     if(d.payload.event === "presence"){
@@ -130,10 +120,12 @@ function onWsMessage(evt){
       p2.typingTs = p.ts || 0;
       presence[p.cid] = p2;
       renderStatus();
+    } else if(d.payload.event === "msg"){
+      if(mergeMessages([p])) render(false);
+      renderStatus();
     }
   } else if(d.event === "phx_reply" && d.payload && d.payload.status==="ok"){
-    if(d.topic===ROOM_TOPIC){ joinedRoom = true; publishPresence(); }
-    if(d.topic===DB_TOPIC){ joinedDb = true; }
+    if(d.topic===ROOM_TOPIC){ joinedRoom = true; publishPresence(); fetchHistory(); }
   }
 }
 function connectWs(){

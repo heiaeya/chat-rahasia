@@ -30,7 +30,8 @@ Web chat pribadi, khusus buat berdua. Dibuat ringan supaya tetap lancar di brows
 - Vanilla HTML + CSS + JavaScript, tanpa framework & tanpa build step (sengaja, biar ringan di browser lama dan gampang diedit)
 - Hosting statis: Cloudflare Pages (atau hosting statis apa pun)
 - Database: [Supabase](https://supabase.com) (PostgreSQL) — tabel `messages`, 1 baris per pesan, difilter per `room` (= kode room dari link)
-- Sinkronisasi: REST untuk riwayat & kirim pesan + Supabase Realtime (WebSocket) untuk pesan masuk, status online & "sedang mengetik..."
+- Ambil riwayat: fungsi database `get_messages` (hanya bisa dipanggil dengan kode room); kirim pesan: REST insert; pesan masuk real-time + status online & "sedang mengetik...": Supabase Realtime Broadcast per room
+- Keamanan: tabel `messages` TIDAK bisa dibaca langsung pakai anon key (tidak ada policy select) — jadi isi room lain tidak bisa diintip/didump orang asing; satu-satunya jalan membaca adalah tahu kode room-nya
 - Skema database: lihat `src/supabase-schema.sql`
 
 ## Struktur File
