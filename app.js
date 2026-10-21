@@ -158,7 +158,7 @@ function render(forceScroll){
   var box = $("messages");
   var nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 140;
   if(messages.length===0){
-    box.innerHTML = '<div class="empty">Belum ada pesan.<br>Kirim pesan pertama kamu &#128150;</div>';
+    box.innerHTML = '<div class="empty">Belum ada pesan.</div>';
     return;
   }
   var html = '<div class="day-note"><span>Pesan di ruang ini hanya bisa dibuka pakai link rahasia kalian berdua</span></div>';
@@ -310,8 +310,16 @@ $("msgInput").addEventListener("input", function(){
   if(has){ typingTimer=setTimeout(function(){ typingState=false; publishTyping(false); }, 4000); }
 });
 $("replyCancel").addEventListener("click", clearReply);
-$("menuBtn").addEventListener("click", function(){
-  var act = prompt("Menu:\n1 = Ganti nama\n2 = Hapus riwayat di HP ini\n3 = Lihat link room ini\n4 = Keluar / ganti room\n\nKetik nomornya:");
+$("menuBtn").addEventListener("click", function(e){
+  e.stopPropagation();
+  var d = $("menuDrop");
+  d.style.display = (d.style.display==="block") ? "none" : "block";
+});
+document.addEventListener("click", function(e){
+  var d = $("menuDrop");
+  if(d && d.style.display==="block" && !d.contains(e.target)) d.style.display="none";
+});
+function menuAction(act){
   if(act==="3"){ prompt("Link room ini (salin & simpan baik-baik):", roomLink(ROOM)); return; }
   if(act==="4"){ if(confirm("Keluar dari room ini dan kembali ke lobi?")){ location.hash=""; location.reload(); } return; }
   if(act==="1"){
@@ -320,7 +328,14 @@ $("menuBtn").addEventListener("click", function(){
   } else if(act==="2"){
     if(confirm("Hapus riwayat chat di HP ini saja? (di HP dia tidak ikut terhapus)")){ messages=[]; saveLocal(); render(true); }
   }
-});
+}
+var menuItems = document.querySelectorAll("#menuDrop .mi");
+for(var miIdx=0; miIdx<menuItems.length; miIdx++){
+  menuItems[miIdx].addEventListener("click", function(){
+    $("menuDrop").style.display="none";
+    menuAction(this.getAttribute("data-act"));
+  });
+}
 document.addEventListener("visibilitychange", function(){
   if(!document.hidden && me){
     fetchHistory();
