@@ -302,18 +302,37 @@ function initLobby(){
   var createdCode = "";
   $("createRoomBtn").addEventListener("click", function(){
     var btn = this; btn.disabled = true; btn.textContent = "Membuat room...";
-    fetch(API, { method:"POST", headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ name:"chat-berdua-room", data:{ messages:[], presence:{} } }) })
-    .then(function(r){ return r.json(); })
-    .then(function(j){
-      btn.disabled = false; btn.innerHTML = "&#10133; Buat Room Baru";
-      if(j && j.id){
-        createdCode = j.id;
-        $("createdLink").value = roomLink(createdCode);
-        $("createdBox").style.display="block";
-      } else { alert("Gagal membuat room, coba lagi ya."); }
-    })
-    .catch(function(){ btn.disabled = false; btn.innerHTML = "&#10133; Buat Room Baru"; alert("Gagal membuat room (koneksi?), coba lagi ya."); });
+    var attempt = 0;
+    function tryCreate(){
+      attempt++;
+      fetch(API, { method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ name:"chat-berdua-room", data:{ messages:[], presence:{} } }) })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if(j && j.id){
+          btn.disabled = false; btn.innerHTML = "&#10133; Buat Room Baru";
+          createdCode = j.id;
+          $("createdLink").value = roomLink(createdCode);
+          $("createdBox").style.display="block";
+        } else if(attempt < 3){
+          btn.textContent = "Mencoba lagi (" + attempt + ")...";
+          setTimeout(tryCreate, 2000);
+        } else {
+          btn.disabled = false; btn.innerHTML = "&#10133; Buat Room Baru";
+          alert("Gagal membuat room. Balasan server: " + JSON.stringify(j).slice(0,150) + "\nScreenshot pesan ini & kirim ke aku ya.");
+        }
+      })
+      .catch(function(){
+        if(attempt < 3){
+          btn.textContent = "Mencoba lagi (" + attempt + ")...";
+          setTimeout(tryCreate, 2000);
+        } else {
+          btn.disabled = false; btn.innerHTML = "&#10133; Buat Room Baru";
+          alert("Gagal membuat room (koneksi bermasalah). Coba matikan mode pesawat / ganti jaringan, lalu coba lagi.");
+        }
+      });
+    }
+    tryCreate();
   });
   $("createdLink").addEventListener("click", function(){ this.select(); });
   $("enterCreatedBtn").addEventListener("click", function(){ if(createdCode) gotoRoom(createdCode); });
