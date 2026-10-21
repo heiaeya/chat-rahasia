@@ -8,7 +8,6 @@
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body { height:100%; }
   body { font-family: Arial, Helvetica, sans-serif; background:#ece5dd; color:#111; }
-  /* SETUP */
   #setup { min-height:100%; display:flex; align-items:center; justify-content:center; background:#075e54; padding:20px; }
   #setup .card { background:#fff; border-radius:12px; padding:28px 22px; width:100%; max-width:360px; text-align:center; box-shadow:0 4px 18px rgba(0,0,0,.3); }
   #setup h1 { font-size:22px; color:#075e54; margin-bottom:6px; }
@@ -16,7 +15,6 @@
   #setup input { width:100%; padding:13px; font-size:16px; border:1px solid #ccc; border-radius:8px; margin-bottom:14px; }
   #setup button { width:100%; padding:13px; font-size:16px; background:#25d366; color:#fff; border:none; border-radius:8px; font-weight:bold; cursor:pointer; }
   #setup .lock { font-size:36px; margin-bottom:10px; }
-  /* CHAT LAYOUT */
   #chat { display:none; height:100%; flex-direction:column; }
   #header { background:#075e54; color:#fff; padding:10px 14px; display:flex; align-items:center; gap:10px; box-shadow:0 1px 3px rgba(0,0,0,.3); z-index:2; }
   #avatar { width:40px; height:40px; border-radius:50%; background:#128c7e; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:17px; flex-shrink:0; overflow:hidden; }
@@ -58,7 +56,6 @@
   <div class="card">
     <div class="lock">&#128274;</div>
     <h1>Chat Berdua</h1>
-    <!-- Lobby: no room code yet -->
     <div id="lobby">
       <p>Buat room baru buat kalian berdua, atau gabung room yang udah ada pakai kode.</p>
       <button id="createRoomBtn" style="background:#128c7e;">&#10133; Buat Room Baru</button>
@@ -71,7 +68,6 @@
       <input id="joinCode" type="text" placeholder="Tempel kode / link room..." autocomplete="off">
       <button id="joinBtn" style="background:#075e54;">Gabung Room</button>
     </div>
-    <!-- In a room: ask name once -->
     <div id="nameForm" style="display:none;">
       <p>Ruang chat pribadi, cuma buat berdua.<br>Masukin nama kamu sekali aja, langsung bisa chat.</p>
       <input id="nameInput" type="text" placeholder="Nama kamu..." maxlength="30" autocomplete="off">
@@ -93,7 +89,7 @@
     </div>
     <button id="menuBtn" title="Menu">&#8942;</button>
   </div>
-  <div id="netWarn">Koneksi bermasalah, mencoba lagi...</div>
+  <div id="netWarn">Koneksi terputus, menyambung lagi...</div>
   <div id="messages"></div>
   <div id="typingBar"></div>
   <div id="replyBar"><button class="x" id="replyCancel">&#10005;</button><b id="replyName"></b><br><span id="replyText"></span></div>
@@ -106,7 +102,11 @@
 <script>
 (function(){
 "use strict";
-var API = "https://api.restful-api.dev/objects/";
+var SUPA_URL = "https://bxswdjyszvnebwuprajs.supabase.co";
+var SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ4c3dkanlzenZuZWJ3dXByYWpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1NjYyNDUsImV4cCI6MjEwODE0MjI0NX0.sILdhyUIxmVxry6jf_KEablYtcnGcGUcBQJrtyzUa1E";
+var REST = SUPA_URL + "/rest/v1/messages";
+var WS_URL = SUPA_URL.replace(/^http/, "ws") + "/realtime/v1/websocket?apikey=" + SUPA_KEY + "&vsn=1.0.0";
+
 function getRoom(){
   var h = location.hash || "";
   var m = h.match(/r=([a-zA-Z0-9]+)/);
@@ -115,25 +115,38 @@ function getRoom(){
 var ROOM = getRoom();
 var LS_ME = "cb_me_" + ROOM, LS_MSG = "cb_msg_" + ROOM;
 var me = null, messages = [], presence = {}, replyTo = null;
-var lastTypingSent = "", lastHeartbeat = 0, sending = false;
+var ws = null, wsOpen = false, refCounter = 1, joinedDb = false, joinedRoom = false, reconnectTimer = null;
+var DB_TOPIC = "realtime:public:messages";
+var ROOM_TOPIC = "realtime:room-" + ROOM;
 
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function uid(){ return "m" + Date.now().toString(36) + Math.random().toString(36).slice(2,9); }
-function cid(){ return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2,9); }
+function cidNew(){ return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2,9); }
 function fmtTime(ts){ var d=new Date(ts); var hh=d.getHours(); var mm=d.getMinutes(); return (hh<10?"0":"")+hh+":"+(mm<10?"0":"")+mm; }
 function saveLocal(){ try{ localStorage.setItem(LS_MSG, JSON.stringify(messages.slice(-300))); }catch(e){} }
 function loadLocal(){ try{ var raw=localStorage.getItem(LS_MSG); if(raw){ messages=JSON.parse(raw)||[]; } }catch(e){ messages=[]; } }
-
+function headers(extra){
+  var h = { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY, "Content-Type": "application/json" };
+  if(extra){ for(var k in extra) h[k]=extra[k]; }
+  return h;
+}
+function rowToMsg(r){
+  return { id:r.id, cid:r.cid, name:r.name, text:r.body, ts:r.ts,
+           replayMsg:r.replay_msg||undefined, replayName:r.replay_name||undefined };
+}
+function msgToRow(m){
+  return { id:m.id, room:ROOM, cid:m.cid, name:m.name, body:m.text, ts:m.ts,
+           replay_msg:m.replayMsg||null, replay_name:m.replayName||null };
+}
 function mergeMessages(incoming){
   var byId = {}, i, m;
   for(i=0;i<messages.length;i++) byId[messages[i].id]=messages[i];
   var changed=false;
   for(i=0;i<incoming.length;i++){
     m=incoming[i];
-    if(!m || !m.id) continue;
+    if(!m || !m.id || !m.text) continue;
     if(!byId[m.id]){ byId[m.id]=m; changed=true; }
-    else if(!byId[m.id].sent && m.sent){ byId[m.id]=m; changed=true; }
   }
   if(changed){
     var arr=[]; for(var k in byId){ if(byId.hasOwnProperty(k)) arr.push(byId[k]); }
@@ -143,62 +156,112 @@ function mergeMessages(incoming){
   }
   return changed;
 }
-function mergePresence(p){
-  if(!p) return;
-  for(var k in p){ if(p.hasOwnProperty(k)) presence[k]=p[k]; }
-}
 function partner(){
   var best=null;
   for(var k in presence){ if(presence.hasOwnProperty(k) && k!==me.id){ if(!best || presence[k].lastSeen>presence[best].lastSeen) best=k; } }
   if(best) return presence[best];
-  // fallback: from messages
   for(var i=messages.length-1;i>=0;i--){ if(messages[i].cid!==me.id) return { name: messages[i].name, lastSeen: 0, typing:false }; }
   return null;
 }
 
-/* ---------- API sync ---------- */
-function apiGet(cb){
-  fetch(API+ROOM, { cache:"no-store" }).then(function(r){ return r.json(); }).then(function(j){
-    var d = (j && j.data) ? j.data : {};
-    cb(null, d);
-  }).catch(function(e){ cb(e, null); });
+/* ---------- REST ---------- */
+function fetchHistory(){
+  fetch(REST + "?room=eq." + encodeURIComponent(ROOM) + "&order=ts.asc&limit=300", { headers: headers() })
+  .then(function(r){ return r.json(); })
+  .then(function(rows){
+    if(rows && rows.length!==undefined){
+      var arr = [];
+      for(var i=0;i<rows.length;i++) arr.push(rowToMsg(rows[i]));
+      if(mergeMessages(arr)) render(false);
+      renderStatus();
+    }
+  })
+  .catch(function(){ /* local copy still shown */ });
 }
-function apiPut(data, cb){
-  fetch(API+ROOM, { method:"PUT", headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({ name:"arya-private-chat-room", data:data }) })
-  .then(function(r){ return r.json(); }).then(function(j){ cb && cb(null,j); })
-  .catch(function(e){ cb && cb(e,null); });
+function postMessage(m){
+  fetch(REST, { method:"POST", headers: headers({ "Prefer": "return=minimal" }), body: JSON.stringify(msgToRow(m)) })
+  .then(function(r){
+    if(!r.ok){ $("netWarn").style.display="block"; setTimeout(fetchHistory, 2500); }
+  })
+  .catch(function(){ $("netWarn").style.display="block"; setTimeout(fetchHistory, 2500); });
 }
-// fetch-merge-put: keeps server + local union, self-heals if server lost data
-function pushToServer(extraPresence, cb){
-  apiGet(function(err, d){
-    if(err){ cb && cb(err); return; }
-    mergeMessages(d.messages||[]);
-    mergePresence(d.presence||{});
-    if(extraPresence){ presence[me.id]=extraPresence; }
-    var data = { messages: messages.slice(-300), presence: presence };
-    apiPut(data, function(e){ cb && cb(e); });
-  });
+
+/* ---------- Realtime (Phoenix protocol) ---------- */
+function wsSend(obj){
+  if(ws && wsOpen){ try{ ws.send(JSON.stringify(obj)); return true; }catch(e){} }
+  return false;
 }
-function poll(){
-  apiGet(function(err, d){
-    if(err){ $("netWarn").style.display="block"; return; }
+function broadcast(event, payload){
+  wsSend({ topic: ROOM_TOPIC, event: "broadcast", payload: { type:"broadcast", event: event, payload: payload }, ref: String(refCounter++) });
+}
+function publishPresence(){ if(me) broadcast("presence", { cid: me.id, name: me.name, lastSeen: Date.now() }); }
+function publishTyping(t){ if(me) broadcast("typing", { cid: me.id, name: me.name, typing: !!t, ts: Date.now() }); }
+function joinChannels(){
+  wsSend({ topic: DB_TOPIC, event: "phx_join",
+    payload: { config: { broadcast: { ack:false, self:false }, presence: { key:"" },
+      postgres_changes: [ { event:"INSERT", schema:"public", table:"messages", filter:"room=eq."+ROOM } ] },
+      access_token: SUPA_KEY },
+    ref: String(refCounter++) });
+  wsSend({ topic: ROOM_TOPIC, event: "phx_join",
+    payload: { config: { broadcast: { ack:false, self:false }, presence: { key: me.id } }, access_token: SUPA_KEY },
+    ref: String(refCounter++) });
+}
+function onWsMessage(evt){
+  var d = null;
+  try{ d = JSON.parse(evt.data); }catch(e){ return; }
+  if(!d || !d.topic) return;
+  if(d.topic === DB_TOPIC && d.event === "postgres_changes"){
+    var rec = d.payload && d.payload.data && d.payload.data.record;
+    if(rec && rec.room===ROOM && rec.cid!==me.id){
+      if(mergeMessages([rowToMsg(rec)])) render(false);
+      renderStatus();
+    }
+  } else if(d.topic === ROOM_TOPIC && d.event === "broadcast"){
+    var p = d.payload && d.payload.payload;
+    if(!p || !p.cid || p.cid===me.id) return;
+    if(d.payload.event === "presence"){
+      var prev = presence[p.cid] || {};
+      prev.name = p.name || prev.name;
+      prev.lastSeen = p.lastSeen || prev.lastSeen || 0;
+      presence[p.cid] = prev;
+      renderStatus();
+    } else if(d.payload.event === "typing"){
+      var p2 = presence[p.cid] || { name: p.name, lastSeen: 0 };
+      p2.name = p.name || p2.name;
+      p2.typing = !!p.typing;
+      p2.typingTs = p.ts || 0;
+      presence[p.cid] = p2;
+      renderStatus();
+    }
+  } else if(d.event === "phx_reply" && d.payload && d.payload.status==="ok"){
+    if(d.topic===ROOM_TOPIC){ joinedRoom = true; publishPresence(); }
+    if(d.topic===DB_TOPIC){ joinedDb = true; }
+  }
+}
+function connectWs(){
+  if(!me) return;
+  try{ if(ws){ ws.close(); } }catch(e){}
+  try{ ws = new WebSocket(WS_URL); }catch(e){ scheduleWs(); return; }
+  ws.onopen = function(){
+    wsOpen = true; joinedDb = false; joinedRoom = false;
     $("netWarn").style.display="none";
-    var changed = mergeMessages(d.messages||[]);
-    mergePresence(d.presence||{});
-    if(changed) render(false);
+    joinChannels();
+    fetchHistory();
     renderStatus();
-    heartbeat();
-  });
+  };
+  ws.onmessage = onWsMessage;
+  ws.onclose = function(){ wsOpen = false; scheduleWs(); renderStatus(); };
+  ws.onerror = function(){ try{ ws.close(); }catch(e){} };
 }
-function heartbeat(){
-  var now = Date.now();
-  var typing = ($("msgInput").value.trim().length>0);
-  var stateKey = typing ? "t" : "o";
-  if(now-lastHeartbeat < 15000 && lastTypingSent===stateKey) return;
-  lastHeartbeat = now; lastTypingSent = stateKey;
-  pushToServer({ name: me.name, lastSeen: now, typing: typing }, function(){});
+function scheduleWs(){
+  $("netWarn").style.display="block";
+  if(reconnectTimer) return;
+  reconnectTimer = setTimeout(function(){ reconnectTimer = null; connectWs(); }, 3000);
 }
+setInterval(function(){
+  wsSend({ topic:"phoenix", event:"heartbeat", payload:{}, ref: String(refCounter++) });
+  if(wsOpen) publishPresence();
+}, 25000);
 
 /* ---------- Rendering ---------- */
 function render(forceScroll){
@@ -224,7 +287,6 @@ function render(forceScroll){
     html += '</div></div></div>';
   }
   box.innerHTML = html;
-  // reply on click bubble
   var bubbles = box.querySelectorAll(".bubble");
   for(var j=0;j<bubbles.length;j++){
     bubbles[j].addEventListener("click", function(){
@@ -240,15 +302,16 @@ function renderStatus(){
     $("partnerName").textContent = p.name || "Chat Berdua";
     $("avatar").textContent = (p.name||"?").charAt(0).toUpperCase();
     var age = Date.now() - (p.lastSeen||0);
-    if(p.typing){ $("partnerStatus").textContent = "sedang mengetik..."; }
-    else if(p.lastSeen && age < 40000){ $("partnerStatus").textContent = "online"; }
+    var typing = p.typing && p.typingTs && (Date.now()-p.typingTs < 6000);
+    if(typing){ $("partnerStatus").textContent = "sedang mengetik..."; }
+    else if(p.lastSeen && age < 60000){ $("partnerStatus").textContent = "online"; }
     else if(p.lastSeen){ $("partnerStatus").textContent = "terakhir online " + fmtTime(p.lastSeen); }
-    else { $("partnerStatus").textContent = ""; }
-    $("typingBar").style.display = p.typing ? "block" : "none";
-    if(p.typing) $("typingBar").textContent = p.name + " sedang mengetik...";
+    else { $("partnerStatus").textContent = wsOpen ? "" : "menghubungkan..."; }
+    $("typingBar").style.display = typing ? "block" : "none";
+    if(typing) $("typingBar").textContent = p.name + " sedang mengetik...";
   } else {
     $("partnerName").textContent = "Chat Berdua";
-    $("partnerStatus").textContent = "menunggu dia online...";
+    $("partnerStatus").textContent = wsOpen ? "menunggu dia online..." : "menghubungkan...";
     $("typingBar").style.display = "none";
   }
 }
@@ -265,74 +328,40 @@ function clearReply(){ replyTo=null; $("replyBar").style.display="none"; }
 function send(){
   var input = $("msgInput");
   var text = input.value.trim();
-  if(!text || sending) return;
-  var m = { id: uid(), cid: me.id, name: me.name, text: text, ts: Date.now(), sent:false };
+  if(!text) return;
+  var m = { id: uid(), cid: me.id, name: me.name, text: text, ts: Date.now() };
   if(replyTo){ m.replayMsg = replyTo.text; m.replayName = replyTo.name; }
   messages.push(m); saveLocal(); render(true);
   input.value=""; input.style.height="auto"; clearReply();
-  sending = true;
-  pushToServer({ name: me.name, lastSeen: Date.now(), typing:false }, function(err){
-    sending = false;
-    if(!err){ m.sent = true; saveLocal(); }
-    render(false);
-  });
+  publishTyping(false);
+  postMessage(m);
+  publishPresence();
 }
 
-/* ---------- Boot ---------- */
-function startChat(){
-  $("setup").style.display="none";
-  var c = $("chat"); c.style.display="flex";
-  loadLocal(); render(true); renderStatus();
-  poll();
-  setInterval(poll, 3000);
-  setInterval(renderStatus, 5000);
-}
+/* ---------- Lobby / rooms ---------- */
 function roomLink(code){ return location.origin + location.pathname + "#r=" + code; }
 function parseCode(raw){
   if(!raw) return "";
   var v = String(raw).trim();
   var m = v.match(/r=([a-zA-Z0-9]+)/);
   if(m) return m[1];
-  v = v.replace(/[^a-zA-Z0-9]/g, "");
-  return v;
+  return v.replace(/[^a-zA-Z0-9]/g, "");
 }
 function gotoRoom(code){ location.hash = "r=" + code; location.reload(); }
+function makeRoomCode(){
+  var s = Date.now().toString(36);
+  var r = "";
+  var chars = "abcdefghjkmnpqrstuvwxyz23456789";
+  for(var i=0;i<14;i++) r += chars.charAt(Math.floor(Math.random()*chars.length));
+  return s + r;
+}
 function initLobby(){
   $("lobby").style.display="block"; $("nameForm").style.display="none";
   var createdCode = "";
   $("createRoomBtn").addEventListener("click", function(){
-    var btn = this; btn.disabled = true; btn.textContent = "Membuat room...";
-    var attempt = 0;
-    function tryCreate(){
-      attempt++;
-      fetch(API, { method:"POST", headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ name:"chat-berdua-room", data:{ messages:[], presence:{} } }) })
-      .then(function(r){ return r.json(); })
-      .then(function(j){
-        if(j && j.id){
-          btn.disabled = false; btn.innerHTML = "&#10133; Buat Room Baru";
-          createdCode = j.id;
-          $("createdLink").value = roomLink(createdCode);
-          $("createdBox").style.display="block";
-        } else if(attempt < 3){
-          btn.textContent = "Mencoba lagi (" + attempt + ")...";
-          setTimeout(tryCreate, 2000);
-        } else {
-          btn.disabled = false; btn.innerHTML = "&#10133; Buat Room Baru";
-          alert("Gagal membuat room. Balasan server: " + JSON.stringify(j).slice(0,150) + "\nScreenshot pesan ini & kirim ke aku ya.");
-        }
-      })
-      .catch(function(){
-        if(attempt < 3){
-          btn.textContent = "Mencoba lagi (" + attempt + ")...";
-          setTimeout(tryCreate, 2000);
-        } else {
-          btn.disabled = false; btn.innerHTML = "&#10133; Buat Room Baru";
-          alert("Gagal membuat room (koneksi bermasalah). Coba matikan mode pesawat / ganti jaringan, lalu coba lagi.");
-        }
-      });
-    }
-    tryCreate();
+    createdCode = makeRoomCode();
+    $("createdLink").value = roomLink(createdCode);
+    $("createdBox").style.display="block";
   });
   $("createdLink").addEventListener("click", function(){ this.select(); });
   $("enterCreatedBtn").addEventListener("click", function(){ if(createdCode) gotoRoom(createdCode); });
@@ -342,6 +371,16 @@ function initLobby(){
     gotoRoom(code);
   });
   $("joinCode").addEventListener("keydown", function(e){ if(e.key==="Enter") $("joinBtn").click(); });
+}
+
+/* ---------- Boot ---------- */
+function startChat(){
+  $("setup").style.display="none";
+  var c = $("chat"); c.style.display="flex";
+  loadLocal(); render(true); renderStatus();
+  fetchHistory();
+  connectWs();
+  setInterval(renderStatus, 5000);
 }
 function init(){
   if(!ROOM){ initLobby(); return; }
@@ -354,10 +393,9 @@ function init(){
   $("enterBtn").addEventListener("click", function(){
     var name = $("nameInput").value.trim();
     if(!name){ alert("Isi nama kamu dulu ya"); return; }
-    me = { id: cid(), name: name };
+    me = { id: cidNew(), name: name };
     try{ localStorage.setItem(LS_ME, JSON.stringify(me)); }catch(e){}
     startChat();
-    pushToServer({ name: me.name, lastSeen: Date.now(), typing:false }, function(){});
   });
   $("nameInput").addEventListener("keydown", function(e){ if(e.key==="Enter") $("enterBtn").click(); });
 }
@@ -365,32 +403,32 @@ $("sendBtn").addEventListener("click", send);
 $("msgInput").addEventListener("keydown", function(e){
   if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); send(); }
 });
+var typingState = false, typingTimer = null;
 $("msgInput").addEventListener("input", function(){
   this.style.height="auto"; this.style.height=Math.min(this.scrollHeight,110)+"px";
-  heartbeat();
+  var has = this.value.trim().length>0;
+  if(has!==typingState){ typingState=has; publishTyping(has); }
+  if(typingTimer) clearTimeout(typingTimer);
+  if(has){ typingTimer=setTimeout(function(){ typingState=false; publishTyping(false); }, 4000); }
 });
 $("replyCancel").addEventListener("click", clearReply);
 $("menuBtn").addEventListener("click", function(){
   var act = prompt("Menu:\n1 = Ganti nama\n2 = Hapus riwayat di HP ini\n3 = Lihat link room ini\n4 = Keluar / ganti room\n\nKetik nomornya:");
-  if(act==="3"){
-    prompt("Link room ini (salin & simpan baik-baik):", roomLink(ROOM));
-    return;
-  }
-  if(act==="4"){
-    if(confirm("Keluar dari room ini dan kembali ke lobi?")){ location.hash=""; location.reload(); }
-    return;
-  }
+  if(act==="3"){ prompt("Link room ini (salin & simpan baik-baik):", roomLink(ROOM)); return; }
+  if(act==="4"){ if(confirm("Keluar dari room ini dan kembali ke lobi?")){ location.hash=""; location.reload(); } return; }
   if(act==="1"){
     var n = prompt("Nama baru:", me.name);
-    if(n && n.trim()){ me.name=n.trim(); try{ localStorage.setItem(LS_ME, JSON.stringify(me)); }catch(e){}
-      pushToServer({ name: me.name, lastSeen: Date.now(), typing:false }, function(){}); alert("Nama diganti jadi: "+me.name); }
+    if(n && n.trim()){ me.name=n.trim(); try{ localStorage.setItem(LS_ME, JSON.stringify(me)); }catch(e){} publishPresence(); alert("Nama diganti jadi: "+me.name); }
   } else if(act==="2"){
-    if(confirm("Hapus riwayat chat di HP ini saja? (di HP dia tidak ikut terhapus)")){
-      messages=[]; saveLocal(); render(true);
-    }
+    if(confirm("Hapus riwayat chat di HP ini saja? (di HP dia tidak ikut terhapus)")){ messages=[]; saveLocal(); render(true); }
   }
 });
-document.addEventListener("visibilitychange", function(){ if(!document.hidden && me) poll(); });
+document.addEventListener("visibilitychange", function(){
+  if(!document.hidden && me){
+    fetchHistory();
+    if(!wsOpen) connectWs(); else publishPresence();
+  }
+});
 init();
 })();
 </script>

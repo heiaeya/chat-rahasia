@@ -9,11 +9,11 @@ Web chat pribadi ala WhatsApp, khusus buat berdua. Dibuat ringan supaya tetap la
 - Buat room sendiri — klik **Buat Room Baru**, dapat link + kode room unik
 - Gabung room pakai kode / link room
 - Masuk cukup pakai nama (sekali saja), tanpa password & tanpa daftar
-- Bubble chat ala WhatsApp, kirim pesan dengan polling ±3 detik
+- Bubble chat ala WhatsApp, pesan terkirim **real-time** (WebSocket, tanpa polling)
 - Balas pesan (reply) — tap bubble pesan
 - Status online / terakhir dilihat + indikator "sedang mengetik..."
 - Centang dua (biru = sudah dilihat pasangan online)
-- Riwayat chat tersimpan di browser masing-masing (localStorage)
+- Riwayat chat tersimpan di database (Postgres) + salinan lokal di browser masing-masing (localStorage)
 
 ## Cara Pakai
 
@@ -28,8 +28,9 @@ Web chat pribadi ala WhatsApp, khusus buat berdua. Dibuat ringan supaya tetap la
 
 - 1 file `index.html` — HTML + CSS + vanilla JavaScript, tanpa framework (sengaja, biar ringan di browser lama)
 - Hosting statis: Cloudflare Pages
-- Penyimpanan pesan bersama: [restful-api.dev](https://restful-api.dev) (objek JSON per room; ID objek = kode room)
-- Sinkronisasi: client melakukan fetch-merge-put + polling, gabungan pesan lokal & server berdasarkan ID pesan
+- Database: [Supabase](https://supabase.com) (PostgreSQL) — tabel `messages`, 1 baris per pesan, difilter per `room` (= kode room dari link)
+- Sinkronisasi: REST untuk riwayat & kirim pesan + Supabase Realtime (WebSocket) untuk pesan masuk, status online & "sedang mengetik..."
+- Skema database: lihat `src/supabase-schema.sql`
 
 ## Pengembangan
 
