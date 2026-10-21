@@ -1,1 +1,3 @@
-config.js
+# config.js SENGAJA ikut di-commit: isinya kunci Supabase "anon" yang memang publik
+# (sudah tersebar di situs live & aman karena database dikunci via RLS + RPC).
+# JANGAN PERNAH taruh kunci service_role di sini.

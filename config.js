@@ -1,0 +1,4 @@
+window.CHAT_CONFIG = {
+  SUPABASE_URL: "https://bxswdjyszvnebwuprajs.supabase.co",
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ4c3dkanlzenZuZWJ3dXByYWpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1NjYyNDUsImV4cCI6MjEwODE0MjI0NX0.sILdhyUIxmVxry6jf_KEablYtcnGcGUcBQJrtyzUa1E"
+};
