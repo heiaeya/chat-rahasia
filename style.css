@@ -1,3 +1,4 @@
+:root { color-scheme: light; }
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body { height:100%; }
   body { font-family: 'Segoe UI', Arial, Helvetica, sans-serif; background:#202020; color:#111; }
