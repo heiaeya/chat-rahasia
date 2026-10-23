@@ -279,19 +279,22 @@ function compressImage(file, cb){
   img.src = url;
 }
 function uploadPhoto(blob, id, cb){
-  var path = ROOM + "/" + id + ".jpg";
+  /* Foto di-upload ke Litterbox (filehoster sementara) - otomatis terhapus setelah 12 jam. */
+  var fd = new FormData();
+  fd.append("reqtype", "fileupload");
+  fd.append("time", "12h");
+  fd.append("fileToUpload", blob, "foto.jpg");
   var xhr = new XMLHttpRequest();
-  xhr.open("POST", SUPA_URL + "/storage/v1/object/photos/" + path, true);
-  xhr.setRequestHeader("apikey", SUPA_KEY);
-  xhr.setRequestHeader("Authorization", "Bearer " + SUPA_KEY);
-  xhr.setRequestHeader("Content-Type", "image/jpeg");
-  xhr.setRequestHeader("x-upsert", "true");
+  xhr.open("POST", "https://litterbox.catbox.moe/resources/internals/api.php", true);
+  xhr.timeout = 90000;
   xhr.onload = function(){
-    if(xhr.status>=200 && xhr.status<300) cb(SUPA_URL + "/storage/v1/object/public/photos/" + path);
+    var url = (xhr.responseText || "").trim();
+    if(xhr.status>=200 && xhr.status<300 && url.indexOf("https://litter.catbox.moe/")===0) cb(url);
     else cb(null);
   };
   xhr.onerror = function(){ cb(null); };
-  xhr.send(blob);
+  xhr.ontimeout = function(){ cb(null); };
+  xhr.send(fd);
 }
 function sendPhoto(file){
   if(!file || (file.type||"").indexOf("image/")!==0){ alert("Itu bukan file gambar"); return; }
