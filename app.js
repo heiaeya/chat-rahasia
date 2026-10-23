@@ -37,6 +37,17 @@ function msgToRow(m){
   return { id:m.id, room:ROOM, cid:m.cid, name:m.name, body:m.text, ts:m.ts,
            replay_msg:m.replayMsg||null, replay_name:m.replayName||null };
 }
+/* ---------- Foto ---------- */
+function isImg(text){ return typeof text==="string" && text.indexOf("img::")===0; }
+function imgUrl(text){ return text.slice(5); }
+function qText(s){ return isImg(s) ? "\uD83D\uDCF7 Foto" : String(s||"").slice(0,90); }
+function findMsg(id){ for(var i=0;i<messages.length;i++) if(messages[i].id===id) return messages[i]; return null; }
+function bodyHTML(m){
+  if(m.pending) return '<div class="bimg sending">Mengirim foto...</div>';
+  if(m.text==="img::failed") return '<div class="bimg failed">Foto gagal terkirim</div>';
+  if(isImg(m.text)) return '<div class="bimg"><img class="photoimg" data-url="'+esc(imgUrl(m.text))+'" src="'+esc(imgUrl(m.text))+'" alt="foto" loading="lazy"></div>';
+  return '<div class="btext">'+esc(m.text)+'</div>';
+}
 function mergeMessages(incoming){
   var byId = {}, i, m;
   for(i=0;i<messages.length;i++) byId[messages[i].id]=messages[i];
@@ -170,16 +181,16 @@ function render(forceScroll){
     if(mine){
       html += '<div class="row me"><div class="mcol">';
       html += '<div class="bubble" data-mid="'+esc(m.id)+'">';
-      if(m.replayMsg) html += '<div class="quote"><b>'+esc(m.replayName||"")+'</b>'+esc(m.replayMsg.slice(0,90))+'</div>';
-      html += '<div class="btext">'+esc(m.text)+'</div></div>';
+      if(m.replayMsg) html += '<div class="quote"><b>'+esc(m.replayName||"")+'</b>'+esc(qText(m.replayMsg))+'</div>';
+      html += bodyHTML(m)+'</div>';
       html += '<div class="bunder"><button class="replybtn" data-mid="'+esc(m.id)+'">&#8617; Balas</button><span>'+fmtTime(m.ts)+'</span><span class="checks '+(read?"":"grey")+'">&#10003;&#10003;</span></div>';
       html += '</div></div>';
     } else {
       html += '<div class="row her"><div class="mavatar">'+esc((m.name||"?").charAt(0).toUpperCase())+'</div><div class="mcol">';
       html += '<div class="bname">'+esc(m.name)+'</div>';
       html += '<div class="bubble" data-mid="'+esc(m.id)+'">';
-      if(m.replayMsg) html += '<div class="quote"><b>'+esc(m.replayName||"")+'</b>'+esc(m.replayMsg.slice(0,90))+'</div>';
-      html += '<div class="btext">'+esc(m.text)+'</div></div>';
+      if(m.replayMsg) html += '<div class="quote"><b>'+esc(m.replayName||"")+'</b>'+esc(qText(m.replayMsg))+'</div>';
+      html += bodyHTML(m)+'</div>';
       html += '<div class="bunder"><button class="replybtn" data-mid="'+esc(m.id)+'">&#8617; Balas</button><span>'+fmtTime(m.ts)+'</span></div>';
       html += '</div></div>';
     }
@@ -190,6 +201,13 @@ function render(forceScroll){
     clickables[j].addEventListener("click", function(){
       var mid = this.getAttribute("data-mid");
       for(var i=0;i<messages.length;i++) if(messages[i].id===mid){ setReply(messages[i]); break; }
+    });
+  }
+  var photoImgs = box.querySelectorAll(".photoimg");
+  for(var q=0;q<photoImgs.length;q++){
+    photoImgs[q].addEventListener("click", function(e){
+      e.stopPropagation();
+      window.open(this.getAttribute("data-url"), "_blank");
     });
   }
   if(forceScroll || nearBottom) box.scrollTop = box.scrollHeight;
@@ -217,7 +235,7 @@ function setReply(m){
   replyTo = m;
   $("replyBar").style.display="block";
   $("replyName").textContent = (m.cid===me.id ? "Kamu" : m.name);
-  $("replyText").textContent = m.text.slice(0,90);
+  $("replyText").textContent = qText(m.text);
   $("msgInput").focus();
 }
 function clearReply(){ replyTo=null; $("replyBar").style.display="none"; }
@@ -234,6 +252,61 @@ function send(){
   publishTyping(false);
   postMessage(m);
   publishPresence();
+}
+
+/* ---------- Kirim foto ---------- */
+function compressImage(file, cb){
+  var url = URL.createObjectURL(file);
+  var img = new Image();
+  img.onload = function(){
+    try{
+      var max = 1280, w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+      var scale = Math.min(1, max / Math.max(w, h));
+      var cw = Math.max(1, Math.round(w*scale)), ch = Math.max(1, Math.round(h*scale));
+      var c = document.createElement("canvas"); c.width = cw; c.height = ch;
+      c.getContext("2d").drawImage(img, 0, 0, cw, ch);
+      URL.revokeObjectURL(url);
+      if(c.toBlob){ c.toBlob(function(b){ cb(b); }, "image/jpeg", 0.82); }
+      else {
+        var du = c.toDataURL("image/jpeg", 0.82);
+        var bin = atob(du.split(",")[1]); var arr = new Uint8Array(bin.length);
+        for(var i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+        cb(new Blob([arr], { type:"image/jpeg" }));
+      }
+    }catch(e){ cb(null); }
+  };
+  img.onerror = function(){ URL.revokeObjectURL(url); cb(null); };
+  img.src = url;
+}
+function uploadPhoto(blob, id, cb){
+  var path = ROOM + "/" + id + ".jpg";
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", SUPA_URL + "/storage/v1/object/photos/" + path, true);
+  xhr.setRequestHeader("apikey", SUPA_KEY);
+  xhr.setRequestHeader("Authorization", "Bearer " + SUPA_KEY);
+  xhr.setRequestHeader("Content-Type", "image/jpeg");
+  xhr.setRequestHeader("x-upsert", "true");
+  xhr.onload = function(){
+    if(xhr.status>=200 && xhr.status<300) cb(SUPA_URL + "/storage/v1/object/public/photos/" + path);
+    else cb(null);
+  };
+  xhr.onerror = function(){ cb(null); };
+  xhr.send(blob);
+}
+function sendPhoto(file){
+  if(!file || (file.type||"").indexOf("image/")!==0){ alert("Itu bukan file gambar"); return; }
+  compressImage(file, function(blob){
+    if(!blob){ alert("Gagal memproses foto"); return; }
+    var m = { id: uid(), cid: me.id, name: me.name, text: "img::pending", ts: Date.now(), pending: true };
+    if(replyTo){ m.replayMsg = replyTo.text; m.replayName = replyTo.name; clearReply(); }
+    messages.push(m); saveLocal(); render(true);
+    uploadPhoto(blob, m.id, function(url){
+      var mm = findMsg(m.id); if(!mm) return;
+      delete mm.pending;
+      if(url){ mm.text = "img::" + url; saveLocal(); render(false); postMessage(mm); publishPresence(); }
+      else { mm.text = "img::failed"; saveLocal(); render(false); alert("Upload foto gagal - cek koneksi, coba lagi"); }
+    });
+  });
 }
 
 /* ---------- Lobby / rooms ---------- */
@@ -275,7 +348,9 @@ function initLobby(){
 function startChat(){
   $("setup").style.display="none";
   var c = $("chat"); c.style.display="flex";
-  loadLocal(); render(true); renderStatus();
+  loadLocal();
+  for(var pi=0; pi<messages.length; pi++){ if(messages[pi].pending){ delete messages[pi].pending; messages[pi].text = "img::failed"; } }
+  render(true); renderStatus();
   fetchHistory();
   connectWs();
   setInterval(renderStatus, 5000);
@@ -298,6 +373,12 @@ function init(){
   $("nameInput").addEventListener("keydown", function(e){ if(e.key==="Enter") $("enterBtn").click(); });
 }
 $("sendBtn").addEventListener("click", send);
+$("photoBtn").addEventListener("click", function(){ $("photoInput").click(); });
+$("photoInput").addEventListener("change", function(){
+  var f = this.files && this.files[0];
+  this.value = "";
+  if(f) sendPhoto(f);
+});
 $("msgInput").addEventListener("keydown", function(e){
   if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); send(); }
 });

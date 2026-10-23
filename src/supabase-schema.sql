@@ -19,3 +19,18 @@ grant execute on function public.get_messages(text) to anon;
 -- Lockdown step for EXISTING (v1) projects that still have the old read policy:
 --   drop policy "anon read" on public.messages;
 -- Run it only AFTER the v4 app (RPC history + broadcast realtime) is deployed.
+
+-- ===== Fitur kirim foto (Supabase Storage) =====
+-- Bucket publik "photos" + izin baca publik & upload untuk anon.
+-- URL foto tidak bisa ditebak (mengandung kode room + id acak), sama seperti model link room.
+insert into storage.buckets (id, name, public)
+values ('photos', 'photos', true)
+on conflict (id) do nothing;
+
+create policy "chat6 photos read" on storage.objects
+for select to anon, authenticated
+using (bucket_id = 'photos');
+
+create policy "chat6 photos upload" on storage.objects
+for insert to anon, authenticated
+with check (bucket_id = 'photos');

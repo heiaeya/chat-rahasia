@@ -12,6 +12,7 @@ Web chat pribadi, khusus buat berdua. Dibuat ringan supaya tetap lancar di brows
 - Tampilan gaya sketsa neo-brutalist (bubble putih tepian hitam + bayangan keras, avatar bulat, kolom selebar layar HP) — bukan ala WhatsApp
 - Pesan terkirim **real-time** (WebSocket, tanpa polling)
 - Balas pesan (reply) — tap bubble pesan
+- Kirim foto — dikompres otomatis di browser, disimpan di Supabase Storage (perlu bucket `photos`, lihat `src/supabase-schema.sql`)
 - Status online / terakhir dilihat + indikator "sedang mengetik..."
 - Centang dua (biru = sudah dilihat pasangan online)
 - Riwayat chat tersimpan di database (Postgres) + salinan lokal di browser masing-masing (localStorage)
